@@ -10,7 +10,7 @@ REF_PENDING = "pending"
 REF_COUNTED = "counted"
 
 TASKS = [
-    ("Добавить 10 человек", "Telegram Premium на 3 месяца", 10),
+    ("Добавить 1 человек", "Telegram Premium на 3 месяца", 10),
     ("Добавить 20 человек", "Telegram Premium на 6 месяцев", 20),
     ("Добавить 30 человек", "Telegram Premium на 1 год", 30),
 ]
