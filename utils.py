@@ -11,6 +11,7 @@ from aiogram.types import (
 )
 
 import config
+import lang_store
 import texts
 
 
@@ -40,17 +41,22 @@ async def answer_with_photo(
 
 
 async def notify_progress(bot: Bot, user_id: int, updates: list[dict]) -> None:
+    lang = lang_store.get_lang(user_id) or "ru"
     for update in updates:
         markup = None
         if update["completed"]:
-            text = texts.task_completed(update["required"], update["reward"])
+            text = texts.task_completed(lang, update["required"], update["reward"])
             markup = InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [InlineKeyboardButton(text="Подписаться на канал", url=config.CHANNEL_LINK)]
+                    [
+                        InlineKeyboardButton(
+                            text=texts.t(lang, "subscribe_btn"), url=config.CHANNEL_LINK
+                        )
+                    ]
                 ]
             )
         else:
-            text = texts.referral_progress(update["progress"], update["required"])
+            text = texts.t(lang, "progress", p=update["progress"], r=update["required"])
         try:
             await bot.send_message(
                 user_id, text, reply_markup=markup, disable_web_page_preview=True
