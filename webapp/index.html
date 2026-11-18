@@ -22,12 +22,19 @@ body{
   padding:18px 16px calc(100px + env(safe-area-inset-bottom));
 }
 .header{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+.header .info{flex:1;min-width:0}
 .logo{
   width:44px;height:44px;border-radius:14px;display:grid;place-items:center;font-size:22px;
   background:linear-gradient(135deg,var(--p1),var(--p2));box-shadow:var(--glow);
 }
 .header h1{font-size:19px;font-weight:700}
 .header p{font-size:13px;color:var(--muted);margin-top:2px}
+.langs{display:flex;gap:4px;background:#1a1230;border:1px solid var(--line);border-radius:12px;padding:3px}
+.langs button{
+  border:0;background:transparent;color:var(--muted);font-size:12px;font-weight:700;
+  padding:7px 10px;border-radius:9px;cursor:pointer;
+}
+.langs button.active{background:linear-gradient(135deg,var(--p1),var(--p2));color:#fff}
 .card{
   background:linear-gradient(180deg,#1a1230,var(--card));
   border:1px solid var(--line);border-radius:20px;padding:18px;margin-bottom:14px;
@@ -95,23 +102,129 @@ body{
 <body>
 <div class="header">
   <div class="logo">💎</div>
-  <div>
+  <div class="info">
     <h1>Premium Tasks</h1>
-    <p id="hello">Загрузка...</p>
+    <p id="hello">...</p>
+  </div>
+  <div class="langs" id="langs">
+    <button data-lang="ru">RU</button>
+    <button data-lang="en">EN</button>
   </div>
 </div>
 
-<div id="app"><div class="loader">Загрузка...</div></div>
+<div id="app"><div class="loader">...</div></div>
 
 <nav class="tabs" id="tabs">
-  <button class="tab active" data-tab="new"><b>✨</b>Новые</button>
-  <button class="tab" data-tab="active"><b>⏳</b>Выполняются</button>
-  <button class="tab" data-tab="support"><b>💬</b>Поддержка</button>
+  <button class="tab active" data-tab="new"><b>✨</b><span id="tab_new"></span></button>
+  <button class="tab" data-tab="active"><b>⏳</b><span id="tab_active"></span></button>
+  <button class="tab" data-tab="support"><b>💬</b><span id="tab_support"></span></button>
 </nav>
 
 <div class="toast" id="toast"></div>
 
 <script>
+const I18N = {
+  ru: {
+    hello: "Привет, {name}!",
+    tab_new: "Новые", tab_active: "Выполняются", tab_support: "Поддержка",
+    open_tg: "Откройте приложение через Telegram-бота.",
+    gate_title: "Подпишитесь на канал",
+    gate_text: "Чтобы пользоваться ботом, подайте заявку на вступление в наш канал. После отправки заявки приложение откроется автоматически.",
+    gate_open: "Подписаться на канал",
+    gate_chat: "Прислать ссылку в чат",
+    gate_check: "Я отправил заявку",
+    gate_notfound: "Заявка не найдена. Сначала подайте заявку в канал",
+    link_sent: "Ссылка отправлена в чат с ботом. Закройте приложение и нажмите кнопку",
+    title: "Добавить {n} человек",
+    invite_text: "Пригласите {n} человек по своей ссылке и получите {reward}.",
+    take: "Взять задание",
+    locked_btn: "🔒 Сначала выполните текущее задание",
+    locked_toast: "Сначала выполните текущее задание",
+    locked_notice: "Сначала выполните текущее задание: {reward} (осталось добавить {left})",
+    in_progress: "Выполняется: ",
+    st_progress: "В процессе",
+    st_done: "Выполнено",
+    left: "Осталось добавить:",
+    done_text: "Вы добавили {n} человек! Подпишитесь на канал и получите {reward}.",
+    sub_ok: "Подписка подтверждена ✅",
+    sub_no: "Вы ещё не подписаны на канал",
+    open_channel: "Открыть канал",
+    send_link: "Прислать ссылку в чат",
+    i_subscribed: "Я подписался",
+    copy: "Копировать", share: "Поделиться",
+    copied: "Ссылка скопирована 📋",
+    taken: "Задание взято!",
+    share_text: "Выполняй задания и получай Telegram Premium!",
+    no_new: "Новых заданий пока нет.",
+    no_active: "У вас нет выполняемых заданий.",
+    support_title: "Поддержка",
+    support_text: "По всем вопросам пишите: {support}",
+    support_btn: "Написать в поддержку",
+    no_channel: "Ссылка на канал не указана",
+    open_fail: "Не удалось открыть ссылку",
+    server_err: "Ошибка сервера"
+  },
+  en: {
+    hello: "Hello, {name}!",
+    tab_new: "New", tab_active: "In progress", tab_support: "Support",
+    open_tg: "Open the app through the Telegram bot.",
+    gate_title: "Subscribe to the channel",
+    gate_text: "To use the bot, send a join request to our channel. After you send it, the app will open automatically.",
+    gate_open: "Subscribe to channel",
+    gate_chat: "Send link to chat",
+    gate_check: "I sent the request",
+    gate_notfound: "Request not found. Send a join request to the channel first",
+    link_sent: "The link was sent to your chat with the bot. Close the app and tap the button",
+    title: "Add {n} people",
+    invite_text: "Invite {n} people with your link and get {reward}.",
+    take: "Take task",
+    locked_btn: "🔒 Complete the current task first",
+    locked_toast: "Complete the current task first",
+    locked_notice: "Complete the current task first: {reward} ({left} left to add)",
+    in_progress: "In progress: ",
+    st_progress: "In progress",
+    st_done: "Completed",
+    left: "Left to add:",
+    done_text: "You invited {n} people! Subscribe to the channel and get {reward}.",
+    sub_ok: "Subscription confirmed ✅",
+    sub_no: "You are not subscribed to the channel yet",
+    open_channel: "Open channel",
+    send_link: "Send link to chat",
+    i_subscribed: "I subscribed",
+    copy: "Copy", share: "Share",
+    copied: "Link copied 📋",
+    taken: "Task taken!",
+    share_text: "Complete tasks and get Telegram Premium!",
+    no_new: "No new tasks yet.",
+    no_active: "You have no tasks in progress.",
+    support_title: "Support",
+    support_text: "For any questions contact: {support}",
+    support_btn: "Contact support",
+    no_channel: "Channel link is not set",
+    open_fail: "Could not open the link",
+    server_err: "Server error"
+  }
+};
+
+const REWARDS_EN = {
+  "Telegram Premium на 3 месяца": "Telegram Premium for 3 months",
+  "Telegram Premium на 6 месяцев": "Telegram Premium for 6 months",
+  "Telegram Premium на 1 год": "Telegram Premium for 1 year"
+};
+
+const ERRORS_EN = {
+  "Откройте приложение через Telegram": "Open the app through Telegram",
+  "Сначала подайте заявку в канал": "Send a join request to the channel first",
+  "Задание не найдено": "Task not found",
+  "Сначала выполните текущее задание": "Complete the current task first",
+  "Вы уже взяли это задание": "You already took this task",
+  "Ссылка на канал не указана": "Channel link is not set",
+  "Ссылка не указана": "Link is not set",
+  "Не удалось отправить сообщение": "Could not send the message",
+  "Проверка подписки отключена": "Subscription check is disabled",
+  "Не удалось проверить подписку. Бот должен быть админом канала": "Could not check the subscription. The bot must be a channel admin"
+};
+
 const tg = window.Telegram && window.Telegram.WebApp;
 if (tg) {
   tg.ready();
@@ -120,6 +233,14 @@ if (tg) {
 }
 const initData = tg ? tg.initData : "";
 
+function guessLang() {
+  try {
+    const code = (tg.initDataUnsafe.user.language_code || "").toLowerCase().split("-")[0];
+    return ["ru", "uk", "be", "kk"].includes(code) ? "ru" : "en";
+  } catch (e) { return "ru"; }
+}
+
+let lang = guessLang();
 let state = null;
 let tab = "new";
 let subscribed = null;
@@ -127,6 +248,24 @@ let checking = false;
 let lastKey = "";
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function t(key, vars) {
+  let s = (I18N[lang] && I18N[lang][key]) || I18N.ru[key] || key;
+  if (vars) Object.keys(vars).forEach(k => { s = s.split("{" + k + "}").join(vars[k]); });
+  return s;
+}
+
+function rewardText(r) { return lang === "en" ? (REWARDS_EN[r] || r) : r; }
+function errText(m) { return lang === "en" ? (ERRORS_EN[m] || m) : m; }
+
+function applyStatic() {
+  document.documentElement.lang = lang;
+  document.getElementById("tab_new").textContent = t("tab_new");
+  document.getElementById("tab_active").textContent = t("tab_active");
+  document.getElementById("tab_support").textContent = t("tab_support");
+  document.querySelectorAll("#langs button").forEach(b => b.classList.toggle("active", b.dataset.lang === lang));
+  if (state) document.getElementById("hello").textContent = t("hello", {name: state.name});
+}
 
 function toast(text) {
   const el = document.getElementById("toast");
@@ -157,14 +296,14 @@ function openLink(url) {
     else if (tg) tg.openLink(url);
     else window.open(url, "_blank");
   } catch (e) {
-    toast("Не удалось открыть ссылку");
+    toast(t("open_fail"));
   }
 }
 
 function openChannel() {
   const link = state.channel_link;
   if (!link) {
-    toast("Ссылка на канал не указана");
+    toast(t("no_channel"));
     return;
   }
   openLink(link);
@@ -174,9 +313,9 @@ async function sendToChat(path) {
   try {
     await api(path);
     haptic("success");
-    toast("Ссылка отправлена в чат с ботом. Закройте приложение и нажмите кнопку");
+    toast(t("link_sent"));
   } catch (e) {
-    toast(e.message);
+    toast(errText(e.message));
     haptic("error");
   }
 }
@@ -191,56 +330,58 @@ function gateView() {
   return `
     <div class="card gate">
       <div class="big">🔐</div>
-      <h2>Подпишитесь на канал</h2>
-      <p class="muted">Чтобы пользоваться ботом, подайте заявку на вступление в наш канал. После отправки заявки приложение откроется автоматически.</p>
-      <button class="btn" data-action="gate_open">Подписаться на канал</button>
-      <button class="btn ghost" data-action="gate_chat">Прислать ссылку в чат</button>
-      <button class="btn ghost" data-action="gate_check">Я отправил заявку</button>
+      <h2>${t("gate_title")}</h2>
+      <p class="muted">${t("gate_text")}</p>
+      <button class="btn" data-action="gate_open">${t("gate_open")}</button>
+      <button class="btn ghost" data-action="gate_chat">${t("gate_chat")}</button>
+      <button class="btn ghost" data-action="gate_check">${t("gate_check")}</button>
     </div>`;
 }
 
-function taskNew(t, busy) {
+function taskNew(task, busy) {
+  const reward = esc(rewardText(task.reward));
   return `
     <div class="card ${busy ? "locked" : ""}">
-      <div class="row"><h2 style="margin:0">${esc(t.title)}</h2></div>
-      <span class="badge">🎁 ${esc(t.reward)}</span>
-      <p class="muted" style="margin-top:12px">Пригласите ${t.required} человек по своей ссылке и получите ${esc(t.reward)}.</p>
+      <div class="row"><h2 style="margin:0">${esc(t("title", {n: task.required}))}</h2></div>
+      <span class="badge">🎁 ${reward}</span>
+      <p class="muted" style="margin-top:12px">${esc(t("invite_text", {n: task.required, reward: rewardText(task.reward)}))}</p>
       ${busy
-        ? `<button class="btn lock" data-action="locked">🔒 Сначала выполните текущее задание</button>`
-        : `<button class="btn" data-action="take" data-id="${t.id}">Взять задание</button>`}
+        ? `<button class="btn lock" data-action="locked">${t("locked_btn")}</button>`
+        : `<button class="btn" data-action="take" data-id="${task.id}">${t("take")}</button>`}
     </div>`;
 }
 
-function taskActive(t) {
-  const done = t.status === "completed";
-  const pct = Math.min(100, Math.round(t.progress / t.required * 100));
-  const left = Math.max(0, t.required - t.progress);
+function taskActive(task) {
+  const done = task.status === "completed";
+  const pct = Math.min(100, Math.round(task.progress / task.required * 100));
+  const left = Math.max(0, task.required - task.progress);
+  const reward = rewardText(task.reward);
   let html = `
     <div class="card">
       <div class="row">
-        <h2 style="margin:0">${done ? "" : "Выполняется: "}${esc(t.reward)}</h2>
-        <span class="badge ${done ? "ok" : ""}">${done ? "Выполнено" : "В процессе"}</span>
+        <h2 style="margin:0">${done ? "" : esc(t("in_progress"))}${esc(reward)}</h2>
+        <span class="badge ${done ? "ok" : ""}">${done ? t("st_done") : t("st_progress")}</span>
       </div>
-      <div class="count">${t.progress}<span> / ${t.required}</span></div>
+      <div class="count">${task.progress}<span> / ${task.required}</span></div>
       <div class="bar"><i style="width:${pct}%"></i></div>`;
   if (done) {
-    html += `<p class="muted" style="margin-top:14px">Вы добавили ${t.required} человек! Подпишитесь на канал и получите ${esc(t.reward)}.</p>`;
+    html += `<p class="muted" style="margin-top:14px">${esc(t("done_text", {n: task.required, reward: reward}))}</p>`;
     if (subscribed) {
-      html += `<div class="link" style="border-color:var(--ok);color:var(--ok)">Подписка подтверждена ✅</div>`;
+      html += `<div class="link" style="border-color:var(--ok);color:var(--ok)">${t("sub_ok")}</div>`;
     } else {
-      html += `<button class="btn" data-action="channel">Открыть канал</button>`;
-      html += `<button class="btn ghost" data-action="sendlink">Прислать ссылку в чат</button>`;
+      html += `<button class="btn" data-action="channel">${t("open_channel")}</button>`;
+      html += `<button class="btn ghost" data-action="sendlink">${t("send_link")}</button>`;
       if (state.can_check) {
-        html += `<button class="btn ghost" data-action="check">Я подписался</button>`;
+        html += `<button class="btn ghost" data-action="check">${t("i_subscribed")}</button>`;
       }
     }
   } else {
     html += `
-      <div class="left">Осталось добавить: <b>${left}</b></div>
+      <div class="left">${t("left")} <b>${left}</b></div>
       <div class="link" id="reflink">${esc(state.ref_link)}</div>
       <div class="btns">
-        <button class="btn" data-action="copy">Копировать</button>
-        <button class="btn ghost" data-action="share">Поделиться</button>
+        <button class="btn" data-action="copy">${t("copy")}</button>
+        <button class="btn ghost" data-action="share">${t("share")}</button>
       </div>`;
   }
   return html + `</div>`;
@@ -250,8 +391,8 @@ function render() {
   const app = document.getElementById("app");
   const tabs = document.getElementById("tabs");
   document.querySelectorAll(".tab").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  applyStatic();
   if (!state) return;
-  document.getElementById("hello").textContent = "Привет, " + state.name + "!";
 
   if (state.gate_required && !state.gate_passed) {
     tabs.style.display = "none";
@@ -261,25 +402,25 @@ function render() {
   tabs.style.display = "flex";
 
   if (tab === "new") {
-    const list = state.tasks.filter(t => t.status === "new");
+    const list = state.tasks.filter(x => x.status === "new");
     const current = activeTask();
     if (!list.length) {
-      app.innerHTML = `<div class="empty">Новых заданий пока нет.</div>`;
+      app.innerHTML = `<div class="empty">${t("no_new")}</div>`;
     } else {
       const notice = current
-        ? `<div class="notice">Сначала выполните текущее задание: ${esc(current.reward)} (осталось добавить ${Math.max(0, current.required - current.progress)})</div>`
+        ? `<div class="notice">${esc(t("locked_notice", {reward: rewardText(current.reward), left: Math.max(0, current.required - current.progress)}))}</div>`
         : "";
-      app.innerHTML = notice + list.map(t => taskNew(t, !!current)).join("");
+      app.innerHTML = notice + list.map(x => taskNew(x, !!current)).join("");
     }
   } else if (tab === "active") {
-    const list = state.tasks.filter(t => t.status !== "new");
-    app.innerHTML = list.length ? list.map(taskActive).join("") : `<div class="empty">У вас нет выполняемых заданий.</div>`;
+    const list = state.tasks.filter(x => x.status !== "new");
+    app.innerHTML = list.length ? list.map(taskActive).join("") : `<div class="empty">${t("no_active")}</div>`;
   } else {
     app.innerHTML = `
       <div class="card">
-        <h2>Поддержка</h2>
-        <p class="muted">По всем вопросам пишите: ${esc(state.support)}</p>
-        <button class="btn" data-action="support">Написать в поддержку</button>
+        <h2>${t("support_title")}</h2>
+        <p class="muted">${esc(t("support_text", {support: state.support}))}</p>
+        <button class="btn" data-action="support">${t("support_btn")}</button>
       </div>`;
   }
 }
@@ -289,12 +430,12 @@ async function checkSub(silent) {
     const r = await api("/api/check_sub");
     subscribed = r.subscribed;
     if (!silent) {
-      toast(r.subscribed ? "Подписка подтверждена ✅" : "Вы ещё не подписаны на канал");
+      toast(r.subscribed ? t("sub_ok") : t("sub_no"));
       haptic(r.subscribed ? "success" : "warning");
     }
   } catch (e) {
     if (silent) subscribed = false;
-    else toast(e.message);
+    else toast(errText(e.message));
   }
   render();
 }
@@ -302,19 +443,20 @@ async function checkSub(silent) {
 async function load(silent) {
   try {
     const res = await api("/api/state");
-    const key = JSON.stringify(res);
+    const key = JSON.stringify(res) + lang;
     state = res;
+    if (res.lang && res.lang !== lang && !load.localChange) lang = res.lang;
     if (key !== lastKey) {
       lastKey = key;
       render();
     }
-    const hasDone = state.tasks.some(t => t.status === "completed");
+    const hasDone = state.tasks.some(x => x.status === "completed");
     if (hasDone && state.can_check && subscribed === null && !checking) {
       checking = true;
       checkSub(true).finally(() => { checking = false; });
     }
   } catch (e) {
-    if (!silent) document.getElementById("app").innerHTML = `<div class="empty">${esc(e.message)}</div>`;
+    if (!silent) document.getElementById("app").innerHTML = `<div class="empty">${esc(errText(e.message))}</div>`;
   }
 }
 
@@ -332,6 +474,18 @@ async function copyText(text) {
 }
 
 document.addEventListener("click", async ev => {
+  const langBtn = ev.target.closest("#langs button");
+  if (langBtn) {
+    const next = langBtn.dataset.lang;
+    if (next === lang) return;
+    lang = next;
+    load.localChange = true;
+    lastKey = "";
+    render();
+    try { await api("/api/set_lang", {lang: next}); } catch (e) {}
+    load.localChange = false;
+    return;
+  }
   const tabBtn = ev.target.closest(".tab");
   if (tabBtn) {
     tab = tabBtn.dataset.tab;
@@ -351,32 +505,32 @@ document.addEventListener("click", async ev => {
     if (state.gate_passed) {
       haptic("success");
     } else {
-      toast("Заявка не найдена. Сначала подайте заявку в канал");
+      toast(t("gate_notfound"));
       haptic("warning");
     }
   } else if (action === "locked") {
-    toast("Сначала выполните текущее задание");
+    toast(t("locked_toast"));
     haptic("warning");
   } else if (action === "take") {
     btn.disabled = true;
     try {
       state = await api("/api/take", {task_id: Number(btn.dataset.id)});
-      lastKey = JSON.stringify(state);
+      lastKey = JSON.stringify(state) + lang;
       tab = "active";
       haptic("success");
-      toast("Задание взято!");
+      toast(t("taken"));
       render();
     } catch (e) {
-      toast(e.message);
+      toast(errText(e.message));
       haptic("error");
       load(true);
     }
   } else if (action === "copy") {
     await copyText(state.ref_link);
     haptic("success");
-    toast("Ссылка скопирована 📋");
+    toast(t("copied"));
   } else if (action === "share") {
-    const text = encodeURIComponent("Выполняй задания и получай Telegram Premium!");
+    const text = encodeURIComponent(t("share_text"));
     openLink("https://t.me/share/url?url=" + encodeURIComponent(state.ref_link) + "&text=" + text);
   } else if (action === "channel") {
     openChannel();
@@ -389,10 +543,11 @@ document.addEventListener("click", async ev => {
   }
 });
 
+applyStatic();
 if (!initData) {
   document.getElementById("hello").textContent = "";
   document.getElementById("tabs").style.display = "none";
-  document.getElementById("app").innerHTML = `<div class="empty">Откройте приложение через Telegram-бота.</div>`;
+  document.getElementById("app").innerHTML = `<div class="empty">${t("open_tg")}</div>`;
 } else {
   load(false);
   setInterval(() => { if (!document.hidden) load(true); }, 5000);
