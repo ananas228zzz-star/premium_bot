@@ -8,6 +8,8 @@ from pydantic import BaseModel
 
 import config
 import gate_store
+import lang_store
+import texts
 from database import Database
 from utils import build_ref_link, notify_progress
 
@@ -18,6 +20,10 @@ class AuthBody(BaseModel):
 
 class TakeBody(AuthBody):
     task_id: int
+
+
+class LangBody(AuthBody):
+    lang: str
 
 
 def create_app(db: Database, bot: Bot) -> FastAPI:
@@ -31,6 +37,9 @@ def create_app(db: Database, bot: Bot) -> FastAPI:
         if data.user is None:
             raise HTTPException(status_code=401, detail="Откройте приложение через Telegram")
         return data.user
+
+    def user_lang(user) -> str:
+        return lang_store.resolve(user.id, getattr(user, "language_code", None))
 
     async def gate_passed(user_id: int) -> bool:
         if not config.GATE_LINK:
@@ -53,6 +62,7 @@ def create_app(db: Database, bot: Bot) -> FastAPI:
         passed = await gate_passed(user.id)
         base = {
             "name": user.first_name,
+            "lang": user_lang(user),
             "gate_required": bool(config.GATE_LINK),
             "gate_passed": passed,
             "gate_link": config.GATE_LINK,
@@ -111,6 +121,14 @@ def create_app(db: Database, bot: Bot) -> FastAPI:
         user = auth(body.init_data)
         return await build_state(user)
 
+    @app.post("/api/set_lang")
+    async def set_lang(body: LangBody):
+        user = auth(body.init_data)
+        if body.lang not in ("ru", "en"):
+            raise HTTPException(status_code=400, detail="Bad language")
+        lang_store.set_lang(user.id, body.lang)
+        return {"ok": True}
+
     @app.post("/api/take")
     async def take(body: TakeBody):
         user = auth(body.init_data)
@@ -141,11 +159,12 @@ def create_app(db: Database, bot: Bot) -> FastAPI:
         user = auth(body.init_data)
         if not config.CHANNEL_LINK:
             raise HTTPException(status_code=400, detail="Ссылка на канал не указана")
+        lang = user_lang(user)
         await send_link(
             user.id,
             config.CHANNEL_LINK,
-            "Нажмите кнопку ниже, чтобы подписаться на канал:",
-            "Подписаться на канал",
+            texts.t(lang, "channel_msg"),
+            texts.t(lang, "subscribe_btn"),
         )
         return {"ok": True}
 
@@ -154,11 +173,12 @@ def create_app(db: Database, bot: Bot) -> FastAPI:
         user = auth(body.init_data)
         if not config.GATE_LINK:
             raise HTTPException(status_code=400, detail="Ссылка не указана")
+        lang = user_lang(user)
         await send_link(
             user.id,
             config.GATE_LINK,
-            "Подайте заявку на вступление в канал, чтобы пользоваться ботом:",
-            "Подать заявку",
+            texts.t(lang, "gate_msg"),
+            texts.t(lang, "gate_btn"),
         )
         return {"ok": True}
 
