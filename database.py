@@ -1,4 +1,5 @@
 import asyncio
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -20,7 +21,11 @@ CREATE TABLE IF NOT EXISTS users (
     user_id INTEGER PRIMARY KEY,
     username TEXT,
     referrer_id INTEGER,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_activity INTEGER NOT NULL DEFAULT 0,
+    remind_stage INTEGER NOT NULL DEFAULT 0,
+    has_completed INTEGER NOT NULL DEFAULT 0,
+    is_blocked INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS tasks (
@@ -69,12 +74,32 @@ class Database:
         self._conn = await aiosqlite.connect(self._path)
         self._conn.row_factory = aiosqlite.Row
         await self._conn.executescript(SCHEMA)
+        await self._migrate()
         await self._seed_tasks()
         await self._conn.commit()
 
     async def close(self) -> None:
         if self._conn:
             await self._conn.close()
+
+    async def _migrate(self) -> None:
+        cursor = await self._conn.execute("PRAGMA table_info(users)")
+        cols = {row["name"] for row in await cursor.fetchall()}
+        for name in ("last_activity", "remind_stage", "has_completed", "is_blocked"):
+            if name not in cols:
+                await self._conn.execute(
+                    f"ALTER TABLE users ADD COLUMN {name} INTEGER NOT NULL DEFAULT 0"
+                )
+        if "last_activity" not in cols:
+            await self._conn.execute(
+                "UPDATE users SET last_activity = ?", (int(time.time()),)
+            )
+        if "has_completed" not in cols:
+            await self._conn.execute(
+                "UPDATE users SET has_completed = 1 WHERE user_id IN "
+                "(SELECT DISTINCT user_id FROM user_tasks WHERE status = ?)",
+                (TASK_COMPLETED,),
+            )
 
     async def _seed_tasks(self) -> None:
         cursor = await self._conn.execute(
@@ -91,6 +116,41 @@ class Database:
             TASKS,
         )
         await self._conn.execute("UPDATE referrals SET status = ?", (REF_PENDING,))
+
+    async def touch_activity(self, user_id: int, unblock: bool = False) -> None:
+        sql = "UPDATE users SET last_activity = ?, remind_stage = 0"
+        if unblock:
+            sql += ", is_blocked = 0"
+        sql += " WHERE user_id = ?"
+        async with self._lock:
+            await self._conn.execute(sql, (int(time.time()), user_id))
+            await self._conn.commit()
+
+    async def get_reminder_candidates(self, cutoff: int) -> list[aiosqlite.Row]:
+        cursor = await self._conn.execute(
+            "SELECT user_id, remind_stage, last_activity FROM users "
+            "WHERE has_completed = 0 AND is_blocked = 0 AND remind_stage < 3 "
+            "AND last_activity > 0 AND last_activity <= ? ORDER BY last_activity",
+            (cutoff,),
+        )
+        return await cursor.fetchall()
+
+    async def set_remind_stage(
+        self, user_id: int, stage: int, last_activity: int
+    ) -> None:
+        async with self._lock:
+            await self._conn.execute(
+                "UPDATE users SET remind_stage = ? WHERE user_id = ? AND last_activity = ?",
+                (stage, user_id, last_activity),
+            )
+            await self._conn.commit()
+
+    async def mark_blocked(self, user_id: int) -> None:
+        async with self._lock:
+            await self._conn.execute(
+                "UPDATE users SET is_blocked = 1 WHERE user_id = ?", (user_id,)
+            )
+            await self._conn.commit()
 
     async def add_join_request(self, user_id: int) -> None:
         async with self._lock:
@@ -128,8 +188,9 @@ class Database:
                     valid_referrer = referrer_id
 
             await self._conn.execute(
-                "INSERT INTO users (user_id, username, referrer_id) VALUES (?, ?, ?)",
-                (user_id, username, valid_referrer),
+                "INSERT INTO users (user_id, username, referrer_id, last_activity) "
+                "VALUES (?, ?, ?, ?)",
+                (user_id, username, valid_referrer, int(time.time())),
             )
             if valid_referrer:
                 await self._conn.execute(
@@ -240,6 +301,9 @@ class Database:
                     "UPDATE user_tasks SET progress = ?, status = ?, "
                     "completed_at = CURRENT_TIMESTAMP WHERE id = ?",
                     (progress, TASK_COMPLETED, row["id"]),
+                )
+                await self._conn.execute(
+                    "UPDATE users SET has_completed = 1 WHERE user_id = ?", (user_id,)
                 )
             else:
                 await self._conn.execute(

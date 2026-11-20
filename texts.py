@@ -16,6 +16,9 @@ T = {
         "channel_msg": "Нажмите кнопку ниже, чтобы подписаться на канал:",
         "gate_msg": "Подайте заявку на вступление в канал, чтобы пользоваться ботом:",
         "gate_btn": "Подать заявку",
+        "remind_1": "👋 Вы заглядывали за Telegram Premium, но так и не взяли задание. Это быстро: берёте задание и делитесь ссылкой. Остальное покажет приложение.",
+        "remind_2": "💎 Ваш Telegram Premium всё ещё ждёт. Достаточно пригласить друзей по своей ссылке, прогресс виден прямо в приложении.",
+        "remind_3": "⏳ Последнее напоминание: не упустите бесплатный Telegram Premium. Загляните в приложение, это займёт минуту.",
     },
     "en": {
         "start": "Welcome! Here you can get Telegram Premium by completing simple tasks:",
@@ -26,6 +29,9 @@ T = {
         "channel_msg": "Tap the button below to subscribe to the channel:",
         "gate_msg": "Send a join request to the channel to use the bot:",
         "gate_btn": "Send request",
+        "remind_1": "👋 You stopped by for Telegram Premium but haven't taken a task yet. It's quick: take a task and share your link. The app shows the rest.",
+        "remind_2": "💎 Your Telegram Premium is still waiting. Just invite friends with your link, the progress is right in the app.",
+        "remind_3": "⏳ Last reminder: don't miss free Telegram Premium. Open the app, it takes a minute.",
     },
 }
 

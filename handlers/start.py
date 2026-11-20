@@ -18,6 +18,7 @@ async def cmd_start(message: Message, command: CommandObject, db: Database, bot:
     user = message.from_user
     referrer_id = parse_referrer(command.args)
     is_new, valid_referrer = await db.register_user(user.id, user.username, referrer_id)
+    await db.touch_activity(user.id, unblock=True)
     logging.warning(
         "START: user=%s args=%s ref=%s is_new=%s valid_ref=%s",
         user.id, command.args, referrer_id, is_new, valid_referrer,

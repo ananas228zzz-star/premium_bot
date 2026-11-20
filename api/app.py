@@ -38,6 +38,11 @@ def create_app(db: Database, bot: Bot) -> FastAPI:
             raise HTTPException(status_code=401, detail="Откройте приложение через Telegram")
         return data.user
 
+    async def identify(init_data: str):
+        user = auth(init_data)
+        await db.touch_activity(user.id)
+        return user
+
     def user_lang(user) -> str:
         return lang_store.resolve(user.id, getattr(user, "language_code", None))
 
@@ -118,12 +123,12 @@ def create_app(db: Database, bot: Bot) -> FastAPI:
 
     @app.post("/api/state")
     async def state(body: AuthBody):
-        user = auth(body.init_data)
+        user = await identify(body.init_data)
         return await build_state(user)
 
     @app.post("/api/set_lang")
     async def set_lang(body: LangBody):
-        user = auth(body.init_data)
+        user = await identify(body.init_data)
         if body.lang not in ("ru", "en"):
             raise HTTPException(status_code=400, detail="Bad language")
         lang_store.set_lang(user.id, body.lang)
@@ -131,7 +136,7 @@ def create_app(db: Database, bot: Bot) -> FastAPI:
 
     @app.post("/api/take")
     async def take(body: TakeBody):
-        user = auth(body.init_data)
+        user = await identify(body.init_data)
         await db.register_user(user.id, user.username, None)
         if not await gate_passed(user.id):
             raise HTTPException(status_code=403, detail="Сначала подайте заявку в канал")
@@ -150,13 +155,13 @@ def create_app(db: Database, bot: Bot) -> FastAPI:
 
     @app.post("/api/gate_pass")
     async def gate_pass(body: AuthBody):
-        user = auth(body.init_data)
+        user = await identify(body.init_data)
         await db.register_user(user.id, user.username, None)
         return {"ok": await gate_passed(user.id)}
 
     @app.post("/api/send_channel")
     async def send_channel(body: AuthBody):
-        user = auth(body.init_data)
+        user = await identify(body.init_data)
         if not config.CHANNEL_LINK:
             raise HTTPException(status_code=400, detail="Ссылка на канал не указана")
         lang = user_lang(user)
@@ -170,7 +175,7 @@ def create_app(db: Database, bot: Bot) -> FastAPI:
 
     @app.post("/api/send_gate")
     async def send_gate(body: AuthBody):
-        user = auth(body.init_data)
+        user = await identify(body.init_data)
         if not config.GATE_LINK:
             raise HTTPException(status_code=400, detail="Ссылка не указана")
         lang = user_lang(user)
@@ -184,7 +189,7 @@ def create_app(db: Database, bot: Bot) -> FastAPI:
 
     @app.post("/api/check_sub")
     async def check_sub(body: AuthBody):
-        user = auth(body.init_data)
+        user = await identify(body.init_data)
         if not config.CHANNEL_ID:
             raise HTTPException(status_code=400, detail="Проверка подписки отключена")
         try:
